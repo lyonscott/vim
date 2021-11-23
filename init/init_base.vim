@@ -24,6 +24,8 @@ set tabstop=4
 set softtabstop=4
 set shiftwidth=4
 set textwidth=80
+set wrap
+set relativenumber
 set showcmd
 set showmatch
 set matchtime=2
@@ -49,3 +51,6 @@ set undofile
 set backupdir=~/.vim/.backup//
 set directory=~/.vim/.swp//
 set undodir=~/.vim/.undo// 
+
+highlight ColorColumn ctermbg=magenta
+call matchadd('ColorColumn', '\%81v', 100)

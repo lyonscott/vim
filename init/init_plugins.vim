@@ -11,7 +11,7 @@ call plug#end()
 colorscheme gruvbox
 set background=dark
 
-let g:apc_enable_ft = {'text':1, 'lua':1, 'word':1}
+let g:apc_enable_ft = {'text':1, 'lua':1, 'word':1, 'cs':1}
 set cpt=.,k,w,b
 set completeopt=menu,menuone,noselect
 set shortmess+=c

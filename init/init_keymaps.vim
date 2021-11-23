@@ -35,6 +35,11 @@ nmap <silent>\\ :tabnext<cr>
 nmap <leader>r :AsyncRun -mode=term 
 nmap <leader>p :Files<CR>
 nmap <leader>o :Buffers<CR>
-nmap <leader>f :Ag<CR>
+nmap <leader>f :Rg<CR>
 nmap <leader>g :BLines<CR>
 nmap <leader>v :BCommits<CR>
+
+let g:fzf_action={
+  \ 'ctrl-t': 'tab split',
+  \ 'ctrl-x': 'split',
+  \ 'ctrl-v': 'vsplit' }
