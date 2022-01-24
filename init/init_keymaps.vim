@@ -39,6 +39,8 @@ nmap <leader>f :Rg<CR>
 nmap <leader>g :BLines<CR>
 nmap <leader>v :BCommits<CR>
 
+let g:fzf_layout = { 'down': '~40%' }
+
 let g:fzf_action={
   \ 'ctrl-t': 'tab split',
   \ 'ctrl-x': 'split',
