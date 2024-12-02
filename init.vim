@@ -9,7 +9,4 @@ command! -nargs=1 LoadScript exec 'so '.s:home.'/'.'<args>'
 exec 'set rtp+='.s:home
 set rtp+=~/.vim
 
-LoadScript init/init_base.vim
-LoadScript init/init_ignores.vim
-LoadScript init/init_keymaps.vim
-LoadScript init/init_plugins.vim
+LoadScript lyon.vim
