@@ -120,9 +120,11 @@ nmap <leader>ff :Rg<CR>
 nmap <leader>g :BLines<CR>
 nmap <leader>v :BCommits<CR>
 nmap <leader>fw *
+nmap <leader>l :source<CR>
 
 "#PLUGINS
 call plug#begin('~/.vim/plugged')
+Plug 'neovim/nvim-lspconfig'
 Plug 'ggandor/leap.nvim'
 Plug 'morhetz/gruvbox'
 Plug 'junegunn/fzf', { 'do': { -> fzf#install() } }
@@ -167,3 +169,8 @@ nmap <silent> <leader>m :call <SID>qflist__mark_line()<cr>
 "##CONVERT A WORD TO UPPERCASE
 imap <c-u> <esc>viwUwa
 nmap <c-u> viwUw
+imap <c-n> <esc>viwuwa
+nmap <c-n> viwuw
+
+"##LSP
+lua require 'lspconfig'.clangd.setup{}
