@@ -23,7 +23,7 @@ set expandtab
 set tabstop=2
 set softtabstop=2
 set shiftwidth=2
-set textwidth=100
+set textwidth=92
 
 "##LOCATE
 set number
@@ -112,15 +112,15 @@ nmap <silent>\- :tabclose<cr>
 nmap <silent>\[ :tabprev<cr>
 nmap <silent>\] :tabnext<cr>
 nmap <silent>\\ :tabnext<cr>
-tnoremap <Esc> <C-\><C-n>
+tnoremap <Esc> <c-\><c-n>
 
-nmap <leader>p :Files<CR>
-nmap <leader>o :Buffers<CR>
-nmap <leader>ff :Rg<CR>
-nmap <leader>g :BLines<CR>
-nmap <leader>v :BCommits<CR>
+nmap <leader>p :Files<cr>
+nmap <leader>o :Buffers<cr>
+nmap <leader>ff :Rg<cr>
+nmap <leader>g :BLines<cr>
+nmap <leader>v :BCommits<cr>
 nmap <leader>fw *
-nmap <leader>l :source<CR>
+nmap <leader>l :source<cr>
 
 "#PLUGINS
 call plug#begin('~/.vim/plugged')
@@ -174,3 +174,4 @@ nmap <c-n> viwuw
 
 "##LSP
 lua require 'lspconfig'.clangd.setup{}
+nmap <silent> ? :lua vim.diagnostic.open_float()<cr>
