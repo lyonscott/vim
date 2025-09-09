@@ -88,6 +88,8 @@ nmap <c-h> <home>
 nmap <c-l> <end>
 nmap <c-j> 5j
 nmap <c-k> 5k
+nmap <silent> <expr> j (v:count==0? 'gj':'j')
+nmap <silent> <expr> k (v:count==0? 'gk':'k')
 
 imap <c-h> <left>
 imap <c-l> <right>
