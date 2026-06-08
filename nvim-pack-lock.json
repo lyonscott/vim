@@ -1,0 +1,20 @@
+{
+  "plugins": {
+    "fff": {
+      "rev": "394a4dcb686430e790e94f276d9e80cc2bde77d1",
+      "src": "https://github.com/dmtrKovalenko/fff"
+    },
+    "gruvbox": {
+      "rev": "697c00291db857ca0af00ec154e5bd514a79191f",
+      "src": "https://github.com/morhetz/gruvbox"
+    },
+    "leap.nvim": {
+      "rev": "59d70b1bdf8e76e0637e6ebcc150fb6767f67fc5",
+      "src": "https://codeberg.org/andyg/leap.nvim"
+    },
+    "nvim-lspconfig": {
+      "rev": "9573948c38bfabeec353ae7dd7d3ffec4c506a6b",
+      "src": "https://github.com/neovim/nvim-lspconfig"
+    }
+  }
+}
