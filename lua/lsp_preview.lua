@@ -1489,8 +1489,6 @@ end
 local function close_preview_for_source(source_buf)
   local closed = false
   closed = close_implementation_for_source(source_buf) or closed
-  closed = close_flow_preview_for_source(source_buf) or closed
-  closed = close_symbol_preview_for_source(source_buf) or closed
   closed = close_caller_preview_for_source(source_buf) or closed
   if reference_highlight_by_buf[source_buf] then
     clear_reference_highlights(source_buf)
@@ -1979,46 +1977,7 @@ local function open_symbol_preview_window(preview_buf)
 end
 
 function M.open_list()
-  local current_buf = vim.api.nvim_get_current_buf()
-
-  if symbol_preview_state_by_buf[current_buf] then
-    close_symbol_preview()
-    return
-  end
-
-  if close_preview_for_source(current_buf) then
-    return
-  end
-
-  local key = source_key(current_buf)
-  local preview_buf = symbol_preview_by_source[key]
-
-  if not preview_buf or not vim.api.nvim_buf_is_valid(preview_buf) then
-    preview_buf = vim.api.nvim_create_buf(false, true)
-    symbol_preview_by_source[key] = preview_buf
-
-    local source_name = vim.api.nvim_buf_get_name(current_buf)
-    local suffix = source_name ~= '' and display_path(source_name) or tostring(current_buf)
-    vim.api.nvim_buf_set_name(preview_buf, 'lsp-preview://' .. suffix)
-    configure_symbol_preview_buffer(preview_buf)
-  end
-
-  local old_state = symbol_preview_state_by_buf[preview_buf]
-  if old_state and old_state.win and vim.api.nvim_win_is_valid(old_state.win) then
-    vim.api.nvim_set_current_win(old_state.win)
-    return
-  end
-
-  symbol_preview_state_by_buf[preview_buf] = {
-    source_buf = current_buf,
-    source_key = key,
-    source_win = vim.api.nvim_get_current_win(),
-    entries = {},
-    entries_by_row = {},
-  }
-
-  render_symbol_preview(preview_buf)
-  symbol_preview_state_by_buf[preview_buf].win = open_symbol_preview_window(preview_buf)
+  require('lsp_symbols').open()
 end
 
 function M.open_implementation()
@@ -2065,16 +2024,6 @@ function M.open()
 
   if reference_highlight_by_buf[current_buf] then
     clear_reference_highlights(current_buf)
-    return
-  end
-
-  if symbol_preview_state_by_buf[current_buf] then
-    close_symbol_preview()
-    return
-  end
-
-  if flow_state_by_buf[current_buf] then
-    return_to_symbol_preview()
     return
   end
 
@@ -2135,10 +2084,8 @@ end
 
 function M.setup()
   vim.api.nvim_create_user_command('LspPreview', M.open, {})
-  vim.api.nvim_create_user_command('LspPreviewList', M.open_list, {})
   vim.api.nvim_create_user_command('LspPreviewImplementation', M.open_implementation, {})
 
-  vim.api.nvim_create_user_command('LspSymbolPreviewList', M.open_list, {})
   vim.api.nvim_create_user_command('LspSymbolSmartPreview', M.open, {})
   vim.api.nvim_create_user_command('LspImplementationPreview', M.open_implementation, {})
 

@@ -12,6 +12,8 @@ local inactive_winhighlight = 'NormalFloat:Normal,FloatBorder:Comment'
 
 local state = {
   source_win = nil,
+  source_buf = nil,
+  source_name = nil,
   input_buf = nil,
   input_win = nil,
   result_buf = nil,
@@ -33,6 +35,7 @@ local state = {
   old_cmdheight = nil,
   setting_mode = false,
   type_filter = nil,
+  scope = 'project',
 }
 
 local function notify(message, level)
@@ -88,21 +91,30 @@ end
 local function refresh_displays()
   state.display_entries = {}
   for _, item in ipairs(state.results) do
-    local last = state.display_entries[#state.display_entries]
-    if not last or last.filename ~= item.filename then
+    if state.scope == 'buffer' then
       table.insert(state.display_entries, {
-        type = 'file',
+        type = 'match',
         filename = item.filename,
         item = item,
-        display = item.filename,
+        display = item.location_text,
+      })
+    else
+      local last = state.display_entries[#state.display_entries]
+      if not last or last.filename ~= item.filename then
+        table.insert(state.display_entries, {
+          type = 'file',
+          filename = item.filename,
+          item = item,
+          display = item.filename,
+        })
+      end
+      table.insert(state.display_entries, {
+        type = 'match',
+        filename = item.filename,
+        item = item,
+        display = item.location_text,
       })
     end
-    table.insert(state.display_entries, {
-      type = 'match',
-      filename = item.filename,
-      item = item,
-      display = item.location_text,
-    })
   end
 end
 
@@ -139,6 +151,9 @@ local function reset_search_state(query, searching)
 end
 
 local function filter_hint()
+  if state.scope == 'buffer' then
+    return 'buffer'
+  end
   if state.type_filter and state.type_filter ~= '' then
     return 'type: ' .. state.type_filter
   end
@@ -311,7 +326,8 @@ local function render_results()
       vim.api.nvim_win_set_cursor(state.result_win, { #state.display_entries, 0 })
       state.suppress_result_move = false
     end
-    vim.api.nvim_win_set_config(state.result_win, { title = current_result_title(), title_pos = 'left' })
+    local title = state.scope == 'buffer' and '' or current_result_title()
+    vim.api.nvim_win_set_config(state.result_win, { title = title, title_pos = 'left' })
   end
 end
 
@@ -374,10 +390,13 @@ local function close()
   state.input_buf = nil
   state.input_win = nil
   state.source_win = nil
+  state.source_buf = nil
+  state.source_name = nil
   state.result_buf = nil
   state.result_win = nil
   reset_search_state('', false)
   state.setting_mode = false
+  state.scope = 'project'
   bottom_popup.release('rg')
 end
 
@@ -428,6 +447,45 @@ local function append_partial()
   end
 end
 
+local function search_buffer(pattern)
+  if not valid_buf(state.source_buf) then
+    render_results()
+    return
+  end
+
+  local ok, regex = pcall(vim.regex, pattern)
+  if not ok then
+    state.searching = false
+    notify('invalid search pattern: ' .. pattern, vim.log.levels.WARN)
+    render_results()
+    return
+  end
+
+  local filename = state.source_name
+  if not filename or filename == '' then
+    filename = '[No Name]'
+  end
+
+  local lines = vim.api.nvim_buf_get_lines(state.source_buf, 0, -1, false)
+  for index, line in ipairs(lines) do
+    local start_col = regex:match_str(line)
+    if start_col then
+      table.insert(state.results, {
+        filename = filename,
+        lnum = index,
+        col = start_col + 1,
+        text = line,
+        key = filename,
+        location_text = string.format('%s:%s: %s', index, start_col + 1, line),
+        display = string.format('%s:%s: %s', index, start_col + 1, line),
+      })
+    end
+  end
+
+  state.searching = false
+  render_results()
+end
+
 local function start_search(query)
   stop_job()
   stop_render_timer()
@@ -457,6 +515,11 @@ local function start_search(query)
   end
 
   render_results()
+
+  if state.scope == 'buffer' then
+    search_buffer(pattern)
+    return
+  end
 
   local command = {
     'rg',
@@ -824,7 +887,43 @@ local function set_autocmds()
   })
 end
 
-function M.open()
+local function last_search_pattern()
+  if vim.v.hlsearch == 0 then
+    return ''
+  end
+
+  local pattern = vim.fn.getreg('/')
+  pattern = vim.trim(pattern or '')
+  pattern = pattern:gsub([[\V]], '')
+  pattern = pattern:gsub([[\<]], '')
+  pattern = pattern:gsub([[\>]], '')
+  pattern = pattern:gsub([[\/]], '/')
+  pattern = pattern:gsub([[\_s]], ' ')
+  pattern = pattern:gsub([[\s]], ' ')
+  pattern = pattern:gsub([[\\]], [[\]])
+  return pattern
+end
+
+local function set_input_and_search(pattern)
+  pattern = vim.trim(pattern or '')
+  if not valid_buf(state.input_buf) then
+    return
+  end
+
+  state.suppress_change = true
+  vim.api.nvim_buf_set_lines(state.input_buf, 0, -1, false, { pattern })
+  state.suppress_change = false
+  if valid_win(state.input_win) then
+    vim.api.nvim_win_set_cursor(state.input_win, { 1, #pattern })
+    vim.cmd('startinsert!')
+  end
+  if pattern ~= '' then
+    start_search(pattern)
+  end
+end
+
+function M.open(scope, opts)
+  opts = opts or {}
   if valid_win(state.input_win) then
     focus_input()
     return
@@ -832,11 +931,16 @@ function M.open()
 
   bottom_popup.claim('rg')
   local source_win = vim.api.nvim_get_current_win()
+  local source_buf = vim.api.nvim_get_current_buf()
+  local source_name = vim.api.nvim_buf_get_name(source_buf)
   close()
   bottom_popup.claim('rg')
   state.old_cmdheight = vim.o.cmdheight
   vim.o.cmdheight = 0
   state.source_win = source_win
+  state.source_buf = source_buf
+  state.source_name = source_name
+  state.scope = scope == 'buffer' and 'buffer' or 'project'
   create_input_buffer()
   create_result_buffer()
 
@@ -853,24 +957,20 @@ function M.open()
   render_results()
   set_keymaps()
   set_autocmds()
+  if opts.use_last_search then
+    set_input_and_search(last_search_pattern())
+  end
   focus_input()
 end
 
 function M.search(pattern)
-  pattern = vim.trim(pattern or '')
-  M.open()
-  if not valid_buf(state.input_buf) then
-    return
-  end
+  M.open('project')
+  set_input_and_search(pattern)
+end
 
-  state.suppress_change = true
-  vim.api.nvim_buf_set_lines(state.input_buf, 0, -1, false, { pattern })
-  state.suppress_change = false
-  if valid_win(state.input_win) then
-    vim.api.nvim_win_set_cursor(state.input_win, { 1, #pattern })
-    vim.cmd('startinsert!')
-  end
-  start_search(pattern)
+function M.search_buffer(pattern)
+  M.open('buffer')
+  set_input_and_search(pattern)
 end
 
 function M.setup()
@@ -883,8 +983,12 @@ function M.setup()
     complete = 'file',
   })
 
-  vim.keymap.set('n', '<leader>ff', M.open, { desc = 'Search with rg float' })
-  vim.keymap.set('n', '<leader>r', M.open, { desc = 'Search with rg float' })
+  vim.keymap.set('n', '<leader>ff', function()
+    M.open('buffer', { use_last_search = true })
+  end, { desc = 'Search current buffer with rg float' })
+  vim.keymap.set('n', '<leader>fg', function()
+    M.open('project', { use_last_search = true })
+  end, { desc = 'Search project with rg float' })
   vim.keymap.set('n', '<leader>R', function()
     M.search(vim.fn.expand('<cword>'))
   end, { desc = 'Search word with rg float' })

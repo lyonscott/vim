@@ -32,6 +32,7 @@ local state = {
   suppress_change = false,
   suppress_result_move = false,
   old_cmdheight = nil,
+  mode = 'files',
 }
 
 local function notify(message, level)
@@ -84,6 +85,20 @@ local function reset_results(query, filtering)
   state.partial = ''
   state.follow_tail = true
   state.filtering = filtering or false
+end
+
+local function result_display(item)
+  if type(item) == 'table' then
+    return item.display or item.name or tostring(item.bufnr or '')
+  end
+  return item
+end
+
+local function result_key(item)
+  if type(item) == 'table' then
+    return item.key or item.name or item.display or tostring(item.bufnr or '')
+  end
+  return item
 end
 
 local function result_line_count()
@@ -188,7 +203,7 @@ local function render_results()
   elseif #state.results > state.rendered_count then
     local lines = {}
     for index = state.rendered_count + 1, #state.results do
-      table.insert(lines, state.results[index])
+      table.insert(lines, result_display(state.results[index]))
     end
     if state.rendered_count == 0 then
       vim.api.nvim_buf_set_lines(state.result_buf, 0, -1, false, lines)
@@ -197,7 +212,11 @@ local function render_results()
     end
     state.rendered_count = #state.results
   elseif #state.results < state.rendered_count then
-    vim.api.nvim_buf_set_lines(state.result_buf, 0, -1, false, state.results)
+    local lines = {}
+    for _, item in ipairs(state.results) do
+      table.insert(lines, result_display(item))
+    end
+    vim.api.nvim_buf_set_lines(state.result_buf, 0, -1, false, lines)
     state.rendered_count = #state.results
   end
   vim.bo[state.result_buf].modifiable = false
@@ -247,11 +266,11 @@ render_input_hint = function()
 
   local hint
   if state.loading then
-    hint = 'loading files'
+    hint = state.mode == 'buffers' and 'loading buffers' or 'loading files'
   elseif state.filtering then
     hint = 'filtering'
   elseif state.query == '' then
-    hint = string.format('%d files', #state.all_files)
+    hint = state.mode == 'buffers' and string.format('%d buffers', #state.all_files) or string.format('%d files', #state.all_files)
   elseif #state.results == 0 then
     hint = 'no matches'
   else
@@ -291,6 +310,7 @@ local function close()
   reset_results('', false)
   state.all_files = {}
   state.loading = false
+  state.mode = 'files'
   bottom_popup.release('fzf')
 end
 
@@ -351,8 +371,23 @@ local function filter_files(query)
 
   if query == '' then
     state.results = vim.deepcopy(state.all_files)
-    history.sort('fzf', '', state.results, function(path)
-      return path
+    history.sort('fzf', '', state.results, function(item)
+      return result_key(item)
+    end, { direction = 'bottom' })
+    state.filtering = false
+    render_results()
+    return
+  end
+
+  if state.mode == 'buffers' then
+    local lower = query:lower()
+    for _, item in ipairs(state.all_files) do
+      if (item.name or ''):lower():find(lower, 1, true) then
+        table.insert(state.results, item)
+      end
+    end
+    history.sort('fzf', query, state.results, function(item)
+      return result_key(item)
     end, { direction = 'bottom' })
     state.filtering = false
     render_results()
@@ -488,6 +523,41 @@ local function start_file_load()
   end)
 end
 
+local function buffer_name(info)
+  if info.name and info.name ~= '' then
+    return vim.fn.fnamemodify(info.name, ':~:.')
+  end
+  return '[No Name]'
+end
+
+local function start_buffer_load()
+  stop_active_work()
+  state.loading = true
+  state.all_files = {}
+  reset_results('', false)
+  render_results()
+
+  for _, info in ipairs(vim.fn.getbufinfo({ buflisted = 1 })) do
+    local name = buffer_name(info)
+    local modified = info.changed == 1 and ' +' or ''
+    local item = {
+      bufnr = info.bufnr,
+      name = name,
+      key = name,
+      display = string.format('%d  %s%s', info.bufnr, name, modified),
+    }
+    table.insert(state.all_files, item)
+    table.insert(state.results, item)
+  end
+
+  history.sort('fzf', '', state.results, function(item)
+    return result_key(item)
+  end, { direction = 'bottom' })
+  state.loading = false
+  state.rendered_count = 0
+  render_results()
+end
+
 local function resize()
   if not valid_win(state.input_win) then
     return
@@ -533,13 +603,17 @@ local function open_current()
   end
 
   local path = state.results[index]
-  if not path or path == '' then
+  if not path then
     return
   end
 
-  history.record('fzf', state.query, path)
+  history.record('fzf', state.query, result_key(path))
   close()
-  vim.cmd.edit(vim.fn.fnameescape(path))
+  if type(path) == 'table' then
+    vim.cmd.buffer(path.bufnr)
+  else
+    vim.cmd.edit(vim.fn.fnameescape(path))
+  end
 end
 
 local function set_buffers()
@@ -642,10 +716,18 @@ local function set_autocmds()
   })
 end
 
-function M.open()
+function M.open(mode)
+  mode = mode == 'buffers' and 'buffers' or 'files'
   if valid_win(state.input_win) then
-    focus_input()
-    return
+    if state.mode == mode then
+      if mode == 'buffers' then
+        focus_results()
+      else
+        focus_input()
+      end
+      return
+    end
+    close()
   end
 
   bottom_popup.claim('fzf')
@@ -655,6 +737,7 @@ function M.open()
   state.old_cmdheight = vim.o.cmdheight
   vim.o.cmdheight = 0
   state.source_win = source_win
+  state.mode = mode
   set_buffers()
 
   local spec = layout()
@@ -669,13 +752,18 @@ function M.open()
   set_keymaps()
   set_autocmds()
   render_results()
-  start_file_load()
-  focus_input()
+  if mode == 'buffers' then
+    start_buffer_load()
+    focus_results()
+  else
+    start_file_load()
+    focus_input()
+  end
 end
 
 function M.search(query)
   query = vim.trim(query or '')
-  M.open()
+  M.open('files')
   if not valid_buf(state.input_buf) then
     return
   end
@@ -690,6 +778,10 @@ function M.search(query)
   filter_files(query)
 end
 
+function M.buffers()
+  M.open('buffers')
+end
+
 function M.setup()
   bottom_popup.register('fzf', close)
 
@@ -699,7 +791,9 @@ function M.setup()
     nargs = '*',
     complete = 'file',
   })
-  vim.keymap.set('n', '<leader>fg', M.open, { desc = 'Find files with fzf float' })
+  vim.api.nvim_create_user_command('FzfBuffers', M.buffers, {})
+  vim.keymap.set('n', '<leader>p', M.open, { desc = 'Find files with fzf float' })
+  vim.keymap.set('n', '<leader>o', M.buffers, { desc = 'Open buffer with fzf float' })
 end
 
 M.setup()
