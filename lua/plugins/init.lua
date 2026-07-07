@@ -1,4 +1,5 @@
 require('plugins.gruvbox')
 require('plugins.leap')
-require('plugins.fff')
+require('plugins.rg')
+require('plugins.fzf')
 require('plugins.lspconfig')

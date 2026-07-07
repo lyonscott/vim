@@ -1615,12 +1615,6 @@ local function render_symbol_preview(preview_buf)
   replace_buf_lines(preview_buf, lines)
   vim.api.nvim_buf_clear_namespace(preview_buf, ns, 0, -1)
 
-  for row in pairs(entries_by_row) do
-    vim.api.nvim_buf_set_extmark(preview_buf, ns, row - 1, 0, {
-      line_hl_group = 'CursorLine',
-    })
-  end
-
   state.entries = entries
   state.entries_by_row = entries_by_row
 end
