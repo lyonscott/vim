@@ -9,9 +9,7 @@ local config_dir = source:sub(1, 1) == '@' and vim.fn.fnamemodify(source:sub(2),
 vim.opt.runtimepath:append(config_dir)
 vim.opt.runtimepath:append(vim.fn.expand('~/.vim'))
 
-require('lyon')
-require('plugins')
-require('mark')
-require('jump')
-require('logical_flow_list')
-require('lsp_preview')
+require 'lyon'
+require 'mark'
+require 'plugins'
+require 'lsp_preview'
